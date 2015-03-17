@@ -27,10 +27,10 @@ regression <- function()
   colnames(sub_gmd)[1] = "geneid"
   sub_gmd_dt = data.table(sub_gmd, key="geneid")
   geo_dt = data.table(geo, key="geneid")
- 
+
   # join
   A = merge(geo_dt, sub_gmd_dt)[,c("patientid", "geneid", "expression.value"), with=F]
-  
+
   # store as matrix
   library(reshape2)
   A = acast(A, list(names(A)[1], names(A)[2]));
@@ -38,11 +38,24 @@ regression <- function()
 
   ### Data management ops end ###
   cat(sprintf('Regression data management: %f\n', (proc.time() - ptm)['elapsed']))
-  ptm = proc.time()
 
+
+  ########## saving out processed data
+  ptm = proc.time()
+  write.table(A, file=paste("A-", NGENES, "-", NPATIENTS, ".csv", sep=""),
+              row.names=FALSE, col.names=FALSE, sep=",", append=FALSE)
+  cat(sprintf('Saving out processed A took: %f\n', (proc.time() - ptm)['elapsed']))
+
+  ptm = proc.time()
+  write.table(response, file=paste("response-", NGENES, "-", NPATIENTS, ".csv", sep=""),
+              row.names=FALSE, col.names=FALSE, sep=",", append=FALSE)
+  cat(sprintf('Saving out processed response took: %f\n', (proc.time() - ptm)['elapsed']))
+
+
+  # ptm = proc.time()
   # run regression
-  lm.fit(x=A, y=response)
-  cat(sprintf('Regression analytics: %f\n', (proc.time() - ptm)['elapsed']))
+  # lm.fit(x=A, y=response)
+  # cat(sprintf('Regression analytics: %f\n', (proc.time() - ptm)['elapsed']))
 }
 
 covariance <- function()
@@ -68,12 +81,12 @@ covariance <- function()
 
   # join
   A = merge(geo_dt, sub_pmd_dt)[,c("patientid", "geneid", "expression.value"), with=F]
-  
+
   # store as matrix
   library(reshape2)
   A = acast(A, list(names(A)[1], names(A)[2]));
   midtm = (proc.time() - ptm)['elapsed']
-  ptm = proc.time()  
+  ptm = proc.time()
 
   # calculate covariance
   covar = cov(A)
@@ -82,8 +95,8 @@ covariance <- function()
 
   covar <- which(covar>0.01*(max(covar)), arr.ind=T)
   res = merge(covar, gmd_dt, by.x='row', by.y='id')
-  res = merge(res, gmd_dt, by.x='col', by.y='id')  
- 
+  res = merge(res, gmd_dt, by.x='col', by.y='id')
+
   ### Data management ops end ###
   cat(sprintf('Regression data management: %f\n', (proc.time() - ptm)['elapsed'] + midtm))
 }
@@ -99,7 +112,7 @@ biclustering<-function()
 
   load(GEO)
   load(PATIENTS)
-  
+
   sub_pmd = patients[patients$gender==1 & patients$age<=40,]
 
     # convert to data tables
@@ -118,13 +131,13 @@ biclustering<-function()
   cat(sprintf('Regression data management: %f\n', (proc.time() - ptm)['elapsed']))
   return()
   ptm = proc.time()
-  
+
   # run biclustering
   library(biclust)
   library("s4vd")
   biclust(A, method=BCssvd, K=1)
   cat(sprintf('Biclust analytics: %f\n', (proc.time() - ptm)['elapsed']))
-} 
+}
 
 svd_irlba <- function()
 {
@@ -188,7 +201,7 @@ stats <- function()
   library(reshape2)
   A = acast(geo, list(names(geo)[1], names(geo)[2]));
   go = sparseMatrix(go[,1], go[,2], x=go[,3])
-  
+
   ### Data management ops end ###
   cat(sprintf('Stats data management: %f\n', (proc.time() - ptm)['elapsed']))
   return()
@@ -208,7 +221,7 @@ stats <- function()
 }
 
 print(paste('Regression: ', system.time(regression(), gcFirst=T)['elapsed'], sep=''));
-print(paste('SVD: ', system.time(svd_irlba(), gcFirst=T)['elapsed'], sep=''));
-print(paste('Covariance: ', system.time(covariance(), gcFirst=T)['elapsed'], sep=''));
-print(paste('Biclustering: ', system.time(biclustering(), gcFirst=T)['elapsed'], sep=''));
-print(paste('Stats: ', system.time(stats(), gcFirst=T)['elapsed'], sep='')); 
+# print(paste('SVD: ', system.time(svd_irlba(), gcFirst=T)['elapsed'], sep=''));
+# print(paste('Covariance: ', system.time(covariance(), gcFirst=T)['elapsed'], sep=''));
+# print(paste('Biclustering: ', system.time(biclustering(), gcFirst=T)['elapsed'], sep=''));
+# print(paste('Stats: ', system.time(stats(), gcFirst=T)['elapsed'], sep=''));
