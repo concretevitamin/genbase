@@ -3,25 +3,30 @@ args <- commandArgs(trailingOnly = TRUE)
 PATH <- args[1]
 NGENES <- args[2]
 NPATIENTS <- args[3]
-GEO <- paste(PATH, '/GEO-', NGENES, '-', NPATIENTS, '.Rdata', sep="")
-GO <- paste(PATH, '/GO-', NGENES, '-', NPATIENTS, '.Rdata', sep="")
-GENES <- paste(PATH, '/GeneMetaData-', NGENES, '-', NPATIENTS, '.Rdata', sep="")
-PATIENTS <- paste(PATH, '/PatientMetaData-', NGENES, '-', NPATIENTS, '.Rdata', sep="")
+GEO <- paste(PATH, '/GEO-', NGENES, '-', NPATIENTS, '.txt', sep="")
+GO <- paste(PATH, '/GO-', NGENES, '-', NPATIENTS, '.txt', sep="")
+GENES <- paste(PATH, '/GeneMetaData-', NGENES, '-', NPATIENTS, '.txt', sep="")
+PATIENTS <- paste(PATH, '/PatientMetaData-', NGENES, '-', NPATIENTS, '.txt', sep="")
 
 regression <- function()
 {
   library(Matrix)
   library(data.table)
+  library(bit64)
 
   ptm = proc.time()
 
   ### Data Management ops start ###
 
-  load(GEO)
-  load(GENES)
-  load(PATIENTS)
+  geo <- as.data.frame(fread(GEO))
+  genes <- as.data.frame(fread(GENES))
+  patients <- as.data.frame(fread(PATIENTS))
 
-  sub_gmd = genes[genes$func < 250,]
+  colnames(genes) <- c("id", "target", "position", "length", "function")
+  colnames(geo) <- c("geneid", "patientid", "expression value")
+  colnames(patients) <- c("id", "age", "gender", "zipcode", "disease", "drug response")
+
+  sub_gmd = genes[genes$`function` < 250,]
 
   # convert to data tables
   colnames(sub_gmd)[1] = "geneid"
@@ -29,33 +34,32 @@ regression <- function()
   geo_dt = data.table(geo, key="geneid")
 
   # join
-  A = merge(geo_dt, sub_gmd_dt)[,c("patientid", "geneid", "expression.value"), with=F]
+  A = merge(geo_dt, sub_gmd_dt)[,c("patientid", "geneid", "expression value"), with=F]
 
   # store as matrix
   library(reshape2)
-  A = acast(A, list(names(A)[1], names(A)[2]));
-  response = patients[,"drug.response"]
+  A = acast(A, list(colnames(A)[1], colnames(A)[2]));
+  response = patients[,"drug response"]
 
   ### Data management ops end ###
   cat(sprintf('Regression data management: %f\n', (proc.time() - ptm)['elapsed']))
 
 
   ########## saving out processed data
-  ptm = proc.time()
-  write.table(A, file=paste("A-", NGENES, "-", NPATIENTS, ".csv", sep=""),
-              row.names=FALSE, col.names=FALSE, sep=",", append=FALSE)
-  cat(sprintf('Saving out processed A took: %f\n', (proc.time() - ptm)['elapsed']))
-
-  ptm = proc.time()
-  write.table(response, file=paste("response-", NGENES, "-", NPATIENTS, ".csv", sep=""),
-              row.names=FALSE, col.names=FALSE, sep=",", append=FALSE)
-  cat(sprintf('Saving out processed response took: %f\n', (proc.time() - ptm)['elapsed']))
-
+  # ptm = proc.time()
+  # write.table(A, file=paste("A-", NGENES, "-", NPATIENTS, ".csv", sep=""),
+  #             row.names=FALSE, col.names=FALSE, sep=",", append=FALSE)
+  # cat(sprintf('Saving out processed A took: %f\n', (proc.time() - ptm)['elapsed']))
 
   # ptm = proc.time()
+  # write.table(response, file=paste("response-", NGENES, "-", NPATIENTS, ".csv", sep=""),
+  #             row.names=FALSE, col.names=FALSE, sep=",", append=FALSE)
+  # cat(sprintf('Saving out processed response took: %f\n', (proc.time() - ptm)['elapsed']))
+
+  ptm = proc.time()
   # run regression
-  # lm.fit(x=A, y=response)
-  # cat(sprintf('Regression analytics: %f\n', (proc.time() - ptm)['elapsed']))
+  lm.fit(x=A, y=response)
+  cat(sprintf('Regression analytics: %f\n', (proc.time() - ptm)['elapsed']))
 }
 
 covariance <- function()
